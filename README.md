@@ -11,7 +11,7 @@ look in original compositions. Study 1 is **Akira (1988)**.
 
 ## One-to-one frame recreation (`engine/trace.py`, `engine/scene.py`)
 
-The first approach above (original compositions in the style) did not look
+The style plates further down (original compositions in the style) did not look
 like the film. The second approach recreates real frames one-to-one: it reads
 a film still and writes it back out as a layered cel scene in code, then
 renders that code with Skia.
