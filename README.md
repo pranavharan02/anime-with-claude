@@ -78,6 +78,24 @@ same-size JPEGs:
 | 1 | 4 of 4 (90-95%) | 0 of 2 (3-4%); the day-1 plate control also 3% |
 | 2, after the print pass | 4 of 4 (88-93%) | 0 of 2 (4-5%) |
 
+Loop 2 (o03 street, o04 skyline) added a 2.5D painting stage
+(`engine/stage.py`: painted gouache textures from `engine/gouache.py` on
+3D quads, lit per texel, perspective-warped), a print stage
+(`engine/print88.py`), mirrored wet-road reflections, and grain matched to
+the film itself (`tools/texbank.py`: flat-area residuals from local frames,
+texture only). Each round pits one candidate against three random real frames
+(`tools/blind.py`):
+
+| Round | Candidate | Judged genuine | Main tell named |
+| --- | --- | --- | --- |
+| r01 | street v1 | 2% | flat-shaded 3D render |
+| r02 | street v2 | 5% | smooth bloom, mechanical perspective |
+| r03 | street v3 / skyline v1 | 8% / 4% | digital glows, procedural detail |
+| r04 | street v4 | 3% | computed perspective, procedural noise |
+
+Real frames in the same rounds scored 30-94% (about 80% on average). A
+paint-over pass (`engine/paintover.py`) was tried and made things worse.
+
 The surface now matches the film; the drawing and painting do not. The judges
 name the same tells each time: vector-even line work, a Western-cartoon face
 instead of Otomo's anatomy, procedural backgrounds instead of gouache, and a
