@@ -1,0 +1,4 @@
+skia-python>=144
+numpy>=2
+opencv-python>=4.10
+pillow>=10
