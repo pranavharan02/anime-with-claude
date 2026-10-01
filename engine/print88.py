@@ -90,7 +90,7 @@ def develop(img, emit=None, seed=0, lens=0.7, grain=(1.7, 0.9), halation=0.35, l
     if texbank:
         out += film_texture(np.clip(out, 0, 1), rs)
         out += (_n(rs, h, w, 4.0) * 0.45 / 255.0)          # the print's faint coarse mottle (measured)
-        grain = (0.0, 0.0)    # the bank already carries the print's own grain
+        grain = (0.0, 0.0)    # film texture only; a uniform overlay read as digital noise (round c03)
     # grain: luminance-dominant, fine clumps plus coarser mottle, scaled by level
     fine = _n(rs, h, w, 0.75)
     coarse = _n(rs, h, w, 2.2)

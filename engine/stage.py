@@ -35,11 +35,13 @@ class Camera:
 
 
 class Stage:
-    def __init__(self, cam, ambient=(0.30, 0.32, 0.45)):
+    def __init__(self, cam, ambient=(0.30, 0.32, 0.45), fog=None):
+        """fog = (colour rgb 0..1, distance in metres at which ~63% is haze)."""
         self.cam = cam
         self.faces = []
         self.lights = []
         self.ambient = np.array(ambient, np.float32)
+        self.fog = fog
 
     def light(self, pos, color, power=1.0, radius=4.0):
         self.lights.append((np.array(pos, float), np.array(color, np.float32), power, radius))
@@ -64,6 +66,25 @@ class Stage:
 
     # -- lighting --------------------------------------------------------------
     def shade(self, fc):
+        tex = self._light(fc)
+        if self.fog is None:
+            return tex
+        col, dist = self.fog
+        c = fc['c']
+        th, tw = tex.shape[:2]
+        if th * tw > 4:
+            u = np.linspace(0, 1, tw, dtype=np.float32)[None, :, None]
+            v = np.linspace(0, 1, th, dtype=np.float32)[:, None, None]
+            top = c[0] + (c[1] - c[0]) * u
+            bot = c[3] + (c[2] - c[3]) * u
+            d = np.linalg.norm(top + (bot - top) * v - self.cam.eye, axis=-1, keepdims=True)
+        else:
+            d = np.full((th, tw, 1), np.linalg.norm(c.mean(0) - self.cam.eye), np.float32)
+        f = (1 - np.exp(-d / dist)).astype(np.float32)
+        fc['_fog'] = f
+        return tex * (1 - f) + np.asarray(col, np.float32) * f
+
+    def _light(self, fc):
         tex = fc['tex']
         if not fc['lit']:
             return tex
@@ -100,6 +121,7 @@ class Stage:
         img = cv2.resize(bg, (W, H), interpolation=cv2.INTER_LINEAR)
         emit = np.zeros_like(img)
         ids = np.full((H, W), -1, np.int32)   # which surface owns each pixel (for paint-over)
+        zb = np.full((H, W), 1e9, np.float32)  # depth of the surface that owns each pixel
         depth = lambda fc: -self.cam.to_cam(fc['c'])[:, 2].mean() + fc['order']
         for fi, fc in sorted(enumerate(self.faces), key=lambda t: depth(t[1])):
             cz = self.cam.to_cam(fc['c'])[:, 2]
@@ -107,27 +129,41 @@ class Stage:
                 continue
             dst, _ = self.cam.project(fc['c'])
             dst = (dst * ss).astype(np.float32)
+            # only touch the face's own screen box: cost follows screen area
+            x0, y0 = int(max(0, np.floor(dst[:, 0].min()) - 1)), int(max(0, np.floor(dst[:, 1].min()) - 1))
+            x1, y1 = int(min(W, np.ceil(dst[:, 0].max()) + 2)), int(min(H, np.ceil(dst[:, 1].max()) + 2))
+            if x1 - x0 < 1 or y1 - y0 < 1:
+                continue
+            bw, bh = x1 - x0, y1 - y0
             th, tw = fc['tex'].shape[:2]
             src = np.float32([[0, 0], [tw, 0], [tw, th], [0, th]])
-            M = cv2.getPerspectiveTransform(src, dst)
+            M = cv2.getPerspectiveTransform(src, dst - np.float32([x0, y0]))
             tex = self.shade(fc)
             a = fc['alpha'] if fc['alpha'] is not None else np.ones((th, tw), np.float32)
-            wa = cv2.warpPerspective(a, M, (W, H), flags=cv2.INTER_LINEAR, borderValue=0)[..., None]
-            wt = cv2.warpPerspective(tex.astype(np.float32), M, (W, H), flags=cv2.INTER_LINEAR,
+            wa = cv2.warpPerspective(a, M, (bw, bh), flags=cv2.INTER_LINEAR, borderValue=0)[..., None]
+            wt = cv2.warpPerspective(tex.astype(np.float32), M, (bw, bh), flags=cv2.INTER_LINEAR,
                                      borderMode=cv2.BORDER_REPLICATE)
-            img = img * (1 - wa) + wt * wa
+            sub = img[y0:y1, x0:x1]
+            sub[:] = sub * (1 - wa) + wt * wa
             if fc['outline']:
                 oc = tuple(float(v) for v in _hex(fc['outline']))
                 cv2.polylines(img, [np.round(dst * 16).astype(np.int32)], True, oc,
                               max(1, int(round(fc['line_w'] * ss))), cv2.LINE_AA, shift=4)
-            ids[wa[..., 0] > 0.5] = fi
-            emit *= (1 - wa)
+            own = wa[..., 0] > 0.5
+            ids[y0:y1, x0:x1][own] = fi
+            zb[y0:y1, x0:x1][own] = float(cz.mean())
+            esub = emit[y0:y1, x0:x1]
+            esub *= (1 - wa)
             if fc['emit'] is not None:
-                emit += cv2.warpPerspective(fc['emit'].astype(np.float32), M, (W, H),
+                em = fc['emit'].astype(np.float32)
+                if '_fog' in fc:
+                    em = em * (1 - 0.75 * fc['_fog'])
+                esub += cv2.warpPerspective(em, M, (bw, bh),
                                             flags=cv2.INTER_LINEAR, borderValue=0) * wa
         img = cv2.resize(img, (w, h), interpolation=cv2.INTER_AREA)
         emit = cv2.resize(emit, (w, h), interpolation=cv2.INTER_AREA)
         self.ids = cv2.resize(ids, (w, h), interpolation=cv2.INTER_NEAREST)
+        self.zbuf = cv2.resize(zb, (w, h), interpolation=cv2.INTER_NEAREST)
         return img, emit
 
     def stroke_dirs(self):

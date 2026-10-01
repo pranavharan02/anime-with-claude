@@ -101,6 +101,33 @@ name the same tells each time: vector-even line work, a Western-cartoon face
 instead of Otomo's anatomy, procedural backgrounds instead of gouache, and a
 tidy modern palette.
 
+## An original Akira-style city (`engine/citygen.py`, `studies/city/`)
+
+A whole megacity generated once and shot from many cameras, built to the rule
+book in `refs/akira/CITY_BIBLE.md` (written by an analysis agent from 1,496
+film frames: strata, tower grammar, painting rules, palettes, camera setups,
+CG tells). About 38,000 building parts: old low-rise, office slabs, a core of
+megatowers built from stacked prisms with setbacks, belts, crowns and spires;
+expressways on teal piers; rooftop plant; billboards with invented words;
+inked cel traffic. Facades are painted per shot at their distance class
+(`engine/facade.py`) with gouache brush tiles (`engine/brushtex.py`).
+
+![city shots](plates/city/contact_sheet.png)
+
+Blind rounds, two judges each, against real city frames from the film:
+
+| Round | Change | Originals judged genuine |
+| --- | --- | --- |
+| c01 | first city, five shots | 3-5% |
+| c02 | brush texture, window dabs, palette, lean, cel cars, cables | 3-6% |
+| c03 | hand-placed windows, edge work, off-grid, billboards, grain | 3-6% |
+| c04 | stronger paint, roof and street clutter, longer lenses | 3-5%; skyline 22% / 15% |
+| s01 | three skylines vs real skylines only | 4-5% |
+
+Real frames in the same rounds: 80-98%. Both judges in every round call the
+originals "the same 3D generator": exact perspective, regular window lattices,
+even lighting, procedural texture.
+
 ## How a frame is made (style plates)
 
 Each frame follows the order a 1988 cel production used:
