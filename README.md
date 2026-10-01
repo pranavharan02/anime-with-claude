@@ -60,6 +60,29 @@ just-noticeable difference):
 Known gaps at 1:1 zoom: ink strokes run a little thin and wobbly and some fine
 strokes break up; JPEG blotches in the source get traced as paint shapes.
 
+## Originals in the scene format (`studies/akira_originals/`)
+
+New frames drawn directly as scene code (airbrush mesh, cel paths, ink
+strokes) with a kit whose defaults are measured from the traced film frames:
+ink colour and widths, muted print palette, lens softness and grain, plus a
+print pass (pigment mottling, halation, lifted blacks, cel dust).
+
+- `o01_glare`: an original character close-up in Otomo's construction
+- `o02_rooftop`: a night rooftop in the vocabulary of the film's night city
+
+Blind tests, each by a fresh judge agent that saw only shuffled,
+same-size JPEGs:
+
+| Round | Real frames judged genuine | Originals judged genuine |
+| --- | --- | --- |
+| 1 | 4 of 4 (90-95%) | 0 of 2 (3-4%); the day-1 plate control also 3% |
+| 2, after the print pass | 4 of 4 (88-93%) | 0 of 2 (4-5%) |
+
+The surface now matches the film; the drawing and painting do not. The judges
+name the same tells each time: vector-even line work, a Western-cartoon face
+instead of Otomo's anatomy, procedural backgrounds instead of gouache, and a
+tidy modern palette.
+
 ## How a frame is made (style plates)
 
 Each frame follows the order a 1988 cel production used:
