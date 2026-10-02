@@ -39,16 +39,16 @@ frames ranged from 30% to 98%. Keep that in mind when you read the scores.
 
 ### Style plates
 
-Original compositions built from scratch: a night city, a bike with a
-tail-light trail, a character close-up, and an energy dome. Shapes are
-authored as control points on centripetal Catmull-Rom curves, inked as tapered
-strokes with slight hand wobble, and shot through a simulated 35 mm print
-(gate weave, halation, grain, and dust).
+Original compositions built from scratch, such as a night city and an energy
+dome rising over a skyline. Shapes are authored as control points on
+centripetal Catmull-Rom curves, inked as tapered strokes with slight hand
+wobble, and shot through a simulated 35 mm print (gate weave, halation, grain,
+and dust).
 
 - Code: `engine/core.py`, `engine/ink.py`, `engine/film.py`, `studies/akira/`
-- Plates: `plates/akira/`, including a 3-second motion test (`m01_trail.mp4`)
+- Plates: `plates/akira/`
 
-![Four style plates: a night city, a bike with a light trail, a rider close-up, and a white dome](plates/akira/contact_sheet.png)
+![Two style plates: a painted night city with an elevated expressway, and a white dome rising behind a silhouetted skyline](plates/akira/contact_sheet.png)
 
 ### Frame-to-code vectorizer
 
@@ -101,6 +101,34 @@ from about 1,500 sampled film frames. The city has:
   traffic.
 
 Nothing in the city copies a building or character from any film.
+
+All of the following frames come from the same generated city.
+
+**Street canyon.** A one-point view down an avenue, with the horizon set low
+and the core towers framed between dark near walls.
+
+![A night street canyon lined with lit office towers, overhead cables, and a red glow at the vanishing point](plates/city/canyon.png)
+
+**Worm's-eye view.** The camera sits at road level and looks up, so the
+towers fill the frame.
+
+![Looking up from street level at teal and amber towers with overhead cables crossing the sky](plates/city/worm.png)
+
+**Bird's-eye view.** A steep look down a canyon, with drum towers, rooftop
+plant, and traffic on the avenue.
+
+![Looking steeply down on the city: cylindrical and box towers, dark rooftops, and lit traffic on the street](plates/city/bird.png)
+
+**Skyline, crimson night.** A telephoto view of the megatower core, with
+searchlights rising from behind the city. Telephoto skylines scored highest
+in the blind rounds, peaking at 22% genuine.
+
+![A telephoto skyline of megatowers against a crimson sky, with searchlight beams rising behind them](plates/city/skyline.png)
+
+**Skyline, violet night.** The same core from a different angle, under a
+blue-violet sky.
+
+![The megatower core seen from another angle against a blue-violet night sky, with searchlights](plates/city/skyline3.png)
 
 ## Lessons from the critics
 
