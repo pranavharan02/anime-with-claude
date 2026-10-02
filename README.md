@@ -1,193 +1,178 @@
 # anime with claude
 
-Hand-drawn-looking anime made entirely in code. No image models, no 3D, no
-traced footage: every line, cel and painted background is placed by code, then
-"shot on film" by a code camera.
+Can anime frames that look hand-painted be made entirely in code, with no image
+models, no 3D packages, and no traced footage? This repository is a working log
+of trying, built in collaboration with Claude. It contains a cel-paint engine, a
+tool that turns a still into editable scene code, a set of original frames, and
+an original procedurally generated megacity in the style of *Akira* (1988).
+Blind AI critics score every result.
 
-The first phase builds style references by studying a film and reproducing its
-look in original compositions. Study 1 is **Akira (1988)**.
+![Four camera setups on one generated city: a street canyon, a worm's-eye view, a bird's-eye view, and a telephoto skyline at night](plates/city/contact_sheet.png)
 
-![Akira study, plates 1-4](plates/akira/contact_sheet.png)
+## Results at a glance
 
-## One-to-one frame recreation (`engine/trace.py`, `engine/scene.py`)
+The short version: reconstructing an existing frame as code works well, but
+original frames don't yet pass as the real thing.
 
-The style plates further down (original compositions in the style) did not look
-like the film. The second approach recreates real frames one-to-one: it reads
-a film still and writes it back out as a layered cel scene in code, then
-renders that code with Skia.
-
-A scene is plain JSON with three layers, in the order a cel was built:
-
-- **airbrush:** a gradient mesh (triangles with per-corner colours) for the
-  painted, airbrushed field underneath
-- **paint:** cel regions as sub-pixel paths (flat or linear gradient), stacked
-  largest-first, each with an edge feather measured from the original
-- **ink:** line centrelines with per-point width and colour, drawn as strokes
-
-How a frame becomes code:
-
-1. Find thin dark ink with a morphological black-hat, skeletonise it, and
-   trace the skeleton into polylines with measured widths.
-2. Inpaint the ink away. Flatten grain (mean-shift), find the paint palette
-   (k-means in Lab, 128 colours), remove slivers with a majority filter, and
-   trace each connected region with marching squares.
-3. Measure each region's edge blur by comparing edge strength at two scales
-   (cel edges are steps, airbrush edges are ramps) and store it as a feather.
-4. Fit the lens softness of the print, then run analysis by synthesis: render
-   the code, measure the error inside every shape, correct its colour, and
-   repeat four times.
-
-```bash
-python studies/akira_frames/recreate.py 048 062 027 008 064
-```
-
-The script reads `ref/akira/akira_NNN.jpg` and writes the scene, renders, a
-2x render (it is vector) and a comparison to `out/akira_frames/`. Reference
-frames and their recreations are copyrighted film material, so `ref/` and
-`out/` are gitignored and stay local.
-
-Results on five frames (mean CIEDE2000 colour error; about 2.3 is the
-just-noticeable difference):
-
-| Frame | Shot | Shapes | Ink strokes | SSIM | PSNR | Mean ΔE |
-| --- | --- | --- | --- | --- | --- | --- |
-| 048 | Kaneda on the bike, green sky | 5,485 | 795 | 0.933 | 33.3 | 1.33 |
-| 062 | Tetsuo close-up | 5,887 | 383 | 0.922 | 34.5 | 1.09 |
-| 027 | Night city windows | 16,206 | 747 | 0.902 | 30.8 | 2.01 |
-| 008 | Kaneda riding, headlight | 3,643 | 67 | 0.963 | 41.0 | 0.68 |
-| 064 | Two bikes on the road | 7,700 | 629 | 0.937 | 33.6 | 1.34 |
-
-Known gaps at 1:1 zoom: ink strokes run a little thin and wobbly and some fine
-strokes break up; JPEG blotches in the source get traced as paint shapes.
-
-## Originals in the scene format (`studies/akira_originals/`)
-
-New frames drawn directly as scene code (airbrush mesh, cel paths, ink
-strokes) with a kit whose defaults are measured from the traced film frames:
-ink colour and widths, muted print palette, lens softness and grain, plus a
-print pass (pigment mottling, halation, lifted blacks, cel dust).
-
-- `o01_glare`: an original character close-up in Otomo's construction
-- `o02_rooftop`: a night rooftop in the vocabulary of the film's night city
-
-Blind tests, each by a fresh judge agent that saw only shuffled,
-same-size JPEGs:
-
-| Round | Real frames judged genuine | Originals judged genuine |
+| Experiment | What it does | Result |
 | --- | --- | --- |
-| 1 | 4 of 4 (90-95%) | 0 of 2 (3-4%); the day-1 plate control also 3% |
-| 2, after the print pass | 4 of 4 (88-93%) | 0 of 2 (4-5%) |
+| [Frame to code](#frame-to-code-vectorizer) | Rebuilds a still as layered scene code (airbrush mesh, cel paths, ink strokes) | Mean color error ΔE 0.7 to 2.0, below the threshold most people notice |
+| [Style plates](#style-plates) | Original compositions drawn from hand-placed curves | Read as "anime", not as the target film |
+| [Original frames](#original-frames) | New frames in the same scene format, then a painted 2.5D stage | 2% to 8% judged genuine |
+| [Original city](#an-original-megacity) | A whole city, generated once and shot from many cameras | 3% to 6% judged genuine, and one skyline at 22% |
 
-Loop 2 (o03 street, o04 skyline) added a 2.5D painting stage
-(`engine/stage.py`: painted gouache textures from `engine/gouache.py` on
-3D quads, lit per texel, perspective-warped), a print stage
-(`engine/print88.py`), mirrored wet-road reflections, and grain matched to
-the film itself (`tools/texbank.py`: flat-area residuals from local frames,
-texture only). Each round pits one candidate against three random real frames
-(`tools/blind.py`):
+Real frames from the film, in the same blind rounds, scored 80% to 98%.
 
-| Round | Candidate | Judged genuine | Main tell named |
-| --- | --- | --- | --- |
-| r01 | street v1 | 2% | flat-shaded 3D render |
-| r02 | street v2 | 5% | smooth bloom, mechanical perspective |
-| r03 | street v3 / skyline v1 | 8% / 4% | digital glows, procedural detail |
-| r04 | street v4 | 3% | computed perspective, procedural noise |
+## How it's measured
 
-Real frames in the same rounds scored 30-94% (about 80% on average). A
-paint-over pass (`engine/paintover.py`) was tried and made things worse.
+The blind test in `tools/blind.py` shuffles candidate frames among real frames
+from the reference film. It resizes every image to the same size and JPEG
+quality, crops letterbox bars, and writes a hidden answer key. A fresh judge
+agent, with no knowledge of the project, then sees only that folder. The judge
+rates each frame's chance of being genuine and lists the tells. Later rounds
+ran two independent judges in parallel.
 
-The surface now matches the film; the drawing and painting do not. The judges
-name the same tells each time: vector-even line work, a Western-cartoon face
-instead of Otomo's anatomy, procedural backgrounds instead of gouache, and a
-tidy modern palette.
+The judge also turns out to be harsh on real frames: across rounds, genuine
+frames ranged from 30% to 98%. Keep that in mind when you read the scores.
 
-## An original Akira-style city (`engine/citygen.py`, `studies/city/`)
+## The experiments
 
-A whole megacity generated once and shot from many cameras, built to the rule
-book in `refs/akira/CITY_BIBLE.md` (written by an analysis agent from 1,496
-film frames: strata, tower grammar, painting rules, palettes, camera setups,
-CG tells). About 38,000 building parts: old low-rise, office slabs, a core of
-megatowers built from stacked prisms with setbacks, belts, crowns and spires;
-expressways on teal piers; rooftop plant; billboards with invented words;
-inked cel traffic. Facades are painted per shot at their distance class
-(`engine/facade.py`) with gouache brush tiles (`engine/brushtex.py`).
+### Style plates
 
-![city shots](plates/city/contact_sheet.png)
+Original compositions built from scratch: a night city, a bike with a
+tail-light trail, a character close-up, and an energy dome. Shapes are
+authored as control points on centripetal Catmull-Rom curves, inked as tapered
+strokes with slight hand wobble, and shot through a simulated 35 mm print
+(gate weave, halation, grain, and dust).
 
-Blind rounds, two judges each, against real city frames from the film:
+- Code: `engine/core.py`, `engine/ink.py`, `engine/film.py`, `studies/akira/`
+- Plates: `plates/akira/`, including a 3-second motion test (`m01_trail.mp4`)
 
-| Round | Change | Originals judged genuine |
-| --- | --- | --- |
-| c01 | first city, five shots | 3-5% |
-| c02 | brush texture, window dabs, palette, lean, cel cars, cables | 3-6% |
-| c03 | hand-placed windows, edge work, off-grid, billboards, grain | 3-6% |
-| c04 | stronger paint, roof and street clutter, longer lenses | 3-5%; skyline 22% / 15% |
-| s01 | three skylines vs real skylines only | 4-5% |
+![Four style plates: a night city, a bike with a light trail, a rider close-up, and a white dome](plates/akira/contact_sheet.png)
 
-Real frames in the same rounds: 80-98%. Both judges in every round call the
-originals "the same 3D generator": exact perspective, regular window lattices,
-even lighting, procedural texture.
+### Frame-to-code vectorizer
 
-## How a frame is made (style plates)
+`engine/trace.py` reads a reference still and writes it back out as a JSON
+scene with three layers, in the order a cel was built:
 
-Each frame follows the order a 1988 cel production used:
+- **Airbrush:** a gradient mesh of triangles with per-corner colors.
+- **Paint:** cel regions as sub-pixel paths, each with a measured edge
+  feather.
+- **Ink:** line centerlines with per-point width and color.
 
-1. **Background painting** (`engine/city.py`, `engine/paint.py`): poster-colour
-   towers in depth layers, gradients toward the street glow, window grids lit in
-   clusters, haze between layers, then pigment texture (brush streaks, tooth,
-   mottling).
-2. **Cels** (`engine/ink.py`): shapes authored as control points on
-   centripetal Catmull-Rom curves, so the code works like placing pencil marks.
-   Each material gets a flat base, one hard-edged shadow tone and sometimes a
-   highlight. Lines are traced strokes with taper, slight width variation and
-   hand wobble. Hair is inked as the union silhouette of its locks.
-3. **Transmitted light** (`engine/fx.py`): lamps, windows and the tail-light
-   trail are drawn into a separate emission pass and bloomed, the way backlit
-   light was photographed through the cels.
-4. **Film** (`engine/film.py`): gate weave, halation, lens softness, a highlight
-   shoulder, lifted cool blacks, vignette, 35 mm grain and dust.
+The pipeline finds ink with a morphological `black-hat` filter and traces its
+skeleton. It then inpaints the ink away, finds the paint palette with k-means
+in Lab color space, and traces each region with marching squares. Last, it
+runs analysis by synthesis: it renders the scene, measures the error inside
+every shape, corrects that shape's color, and repeats.
+`engine/scene.py` renders the result with Skia.
 
-Rendering uses [skia-python](https://github.com/kyamagu/skia-python) for
-anti-aliased vectors and NumPy/OpenCV for compositing and film effects.
+On five test stills the reconstruction reached a mean CIEDE2000 color error of
+0.7 to 2.0 and SSIM of 0.90 to 0.96. At 2x zoom, fine ink strokes run thin, and
+JPEG artifacts in the source get traced as paint.
 
-## Study 1: Akira
+No reference frames or reconstructions are included in this repository. To try
+the tool, supply your own stills; see [Get started](#get-started).
 
-`refs/akira/STYLE.md` records what makes a frame read as Akira (palette, cel
-rules, background rules, light, film). The plates are original compositions in
-that style, not copies of frames from the film.
+### Original frames
 
-| Plate | What it tests |
+New frames written directly in the scene format, with defaults measured from
+the reference material: ink color and width, palette, lens softness, and
+grain. Later frames use a 2.5D painting stage (`engine/stage.py`): every
+surface is a quad in 3D, painted flat as a gouache texture
+(`engine/gouache.py`), lit per texel, and warped into perspective.
+
+![An original night street with signs, a vending machine, wet reflections, and a red tail-light trail](plates/akira_originals/o03_street.png)
+
+### An original megacity
+
+`engine/citygen.py` generates a whole city once, about 38,000 building parts,
+and `studies/city/shots.py` films it from five camera setups. It follows a
+style rule book, `refs/akira/CITY_BIBLE.md`, which an analysis agent wrote
+from about 1,500 sampled film frames. The city has:
+
+- Three building strata: grimy low-rise, office slabs, and a core of
+  megatowers built from stacked prisms with setbacks, belts, crowns, and spires.
+- A hue family per tower, with warm and cool towers alternating.
+- Facades painted per shot at their distance class (`engine/facade.py`), with
+  gouache brush tiles (`engine/brushtex.py`) and hand-placed windows.
+- Haze in discrete planes that glows from the street, expressways on teal
+  piers, rooftop plant, billboards with invented brand names, and inked cel
+  traffic.
+
+Nothing in the city copies a building or character from any film.
+
+## Lessons from the critics
+
+Across five city rounds and two judges per round, the same tells came back:
+
+- **Computed perspective.** A mathematically exact vanishing point reads as a
+  3D render. Telephoto skylines, with almost no convergence, scored highest.
+- **Regular window lattices.** Even with jittered sizes and colors, an
+  underlying grid shows through.
+- **Even light.** Real night backgrounds are mostly near-black, with light
+  pooling and bleeding from a few sources.
+- **Procedural texture.** Noise reads as noise. A uniform grain overlay made
+  scores worse. A brush-stroke repaint pass smeared edges and also made
+  them worse.
+- **Recognition.** Judges recognize scenes and characters from the real film,
+  which gives genuine frames a boost no original frame can earn.
+
+The most promising untried direction is a multiplane approach: layered 2D
+painted flats that slide at different speeds, instead of a 3D camera.
+
+## Get started
+
+You need Python 3.11 or later. `ffmpeg` is optional and only used for MP4
+output.
+
+1. Install the dependencies:
+
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+1. Render the style plates:
+
+   ```bash
+   python studies/akira/p01_city.py
+   python studies/akira/p02_trail.py --motion
+   ```
+
+1. Generate the city and render its shots:
+
+   ```bash
+   python studies/city/shots.py canyon skyline
+   ```
+
+   Renders go to `out/`, which is gitignored.
+
+Some tools work on reference frames that you supply. They read from folders
+that are gitignored, so nothing you add is committed:
+
+| Tool | Reads |
 | --- | --- |
-| `p01_city` | Background painting: depth layers, facades, haze, searchlights |
-| `p02_trail` | Bike and rider cel, tail-light ribbon, parallax speed background |
-| `p03_rider` | Character close-up: clumped hair, two-tone night shading, rim light |
-| `p04_dome` | Effects: the white dome, shock rings, rim-lit silhouettes, light rays |
-| `m01_trail` | Motion: 3 s at 24 fps, cel on twos, trail from the tail light's real path |
+| `studies/akira_frames/recreate.py` | Stills in `ref/akira/` named `akira_NNN.jpg` |
+| `tools/texbank.py` | Frames in `ref/akira_film/` named `f_NNNNN.jpg`; writes `out/texbank.npz` |
+| `tools/blind.py` | Real frames from `ref/akira_film/` to shuffle among your candidates |
 
-Finished plates are in `plates/akira/`.
+Without a texture bank, the print stage falls back to synthetic grain. Sign
+lettering looks for a font with Japanese glyphs and falls back to a default
+font if none is installed.
 
-## Run it
+## Repository layout
 
-```bash
-pip install -r requirements.txt
-python studies/akira/p01_city.py
-python studies/akira/p02_trail.py            # still
-python studies/akira/p02_trail.py --motion   # 72 frames + MP4 (needs ffmpeg)
-python studies/akira/p03_rider.py
-python studies/akira/p04_dome.py
-```
+| Path | Contents |
+| --- | --- |
+| `engine/` | Rendering engine: ink, film print, scene format, vectorizer, 2.5D stage, gouache painting, city generator |
+| `studies/` | One folder per experiment: style plates, frame recreation, original frames, the city |
+| `tools/` | Blind-test harness and texture-bank builder |
+| `refs/akira/` | Written style analysis: `STYLE.md` and `CITY_BIBLE.md` |
+| `plates/` | Finished renders, all original work |
 
-Output goes to `out/` (gitignored).
+## A note on copyright
 
-## Where study 1 falls short of the film
-
-- **Faces:** the close-up reads as anime, but closer to modern TV animation
-  than Otomo. It needs heavier, more realistic structure (cheekbones, eye
-  bags, lip shapes) and less symmetric, rounded forms.
-- **Bike:** the shell is too bulbous and smooth. The film's bike is longer,
-  lower and more mechanical, with more panel detail.
-- **Backgrounds:** the facades are still too regular. Mizutani's paintings have
-  more structural detail (setbacks, signage, pipes, catwalks) and stronger
-  value contrast between near and far.
-- **Dome plate:** the silhouettes are plain rectangles. They need rooftop
-  detail and debris.
+*Akira* is the work of Katsuhiro Otomo and its rights holders. This repository
+contains no frames, stills, or footage from the film, and no reconstructions
+of them. The written analysis in `refs/` is commentary on style. Every image
+in `plates/` is an original composition made by the code here.

@@ -27,6 +27,12 @@ def bloom(emit, levels=((1.2, .5), (3.5, .28), (9, .1))):
 _BANK = None
 
 
+def _bank_available(bank_path=None):
+    from pathlib import Path
+    bp = bank_path or Path(__file__).resolve().parents[1] / 'out' / 'texbank.npz'
+    return _BANK is not None or Path(bp).exists()
+
+
 def film_texture(img, rs, bank_path=None):
     """Quilt real print texture (paint tooth + grain) over the frame, picking
     patches whose source brightness matches the local brightness."""
@@ -87,6 +93,8 @@ def develop(img, emit=None, seed=0, lens=0.7, grain=(1.7, 0.9), halation=0.35, l
     if lens:
         out = cv2.GaussianBlur(out, (0, 0), lens)
     out = np.array(lift, np.float32) + out * (1 - np.array(lift, np.float32))
+    if texbank and not _bank_available():
+        texbank = False      # no local texture bank (tools/texbank.py): fall back to synthetic grain
     if texbank:
         out += film_texture(np.clip(out, 0, 1), rs)
         out += (_n(rs, h, w, 4.0) * 0.45 / 255.0)          # the print's faint coarse mottle (measured)

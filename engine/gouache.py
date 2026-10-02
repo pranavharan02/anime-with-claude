@@ -11,7 +11,18 @@ import cv2
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-FONT = 'C:/Windows/Fonts/YuGothB.ttc'
+FONT = 'C:/Windows/Fonts/YuGothB.ttc'   # any font with Japanese glyphs; falls back if missing
+_FALLBACKS = ['C:/Windows/Fonts/msgothic.ttc', '/System/Library/Fonts/Hiragino Sans GB.ttc',
+              '/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc', 'NotoSansCJK-Bold.ttc', 'DejaVuSans.ttf']
+
+
+def _font(path, size):
+    for p in [path] + _FALLBACKS:
+        try:
+            return ImageFont.truetype(p, size)
+        except OSError:
+            continue
+    return ImageFont.load_default()
 
 
 def hx(h):
@@ -207,7 +218,7 @@ def sign(w, h, text, fg='#1e1b24', bg='#efe6cf', border='#2a2430', vertical=True
     d.rectangle([1, 1, w - 2, h - 2], outline=border, width=max(2, w // 30))
     if vertical:
         size = size or int(min(w * 0.7, h / max(1, len(text)) * 0.85))
-        f = ImageFont.truetype(font, size)
+        f = _font(font, size)
         total = len(text) * size * 1.08
         y = (h - total) / 2
         for ch_ in text:
@@ -216,7 +227,7 @@ def sign(w, h, text, fg='#1e1b24', bg='#efe6cf', border='#2a2430', vertical=True
             y += size * 1.08
     else:
         size = size or int(min(h * 0.62, w / max(1, len(text)) * 0.9))
-        f = ImageFont.truetype(font, size)
+        f = _font(font, size)
         bb = d.textbbox((0, 0), text, font=f)
         d.text(((w - (bb[2] - bb[0])) / 2 - bb[0], (h - (bb[3] - bb[1])) / 2 - bb[1]), text, fill=fg, font=f)
     a = np.asarray(im, np.float32) / 255.0
